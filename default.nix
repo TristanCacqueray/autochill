@@ -13,7 +13,7 @@ in pkgs.mkShell {
     easy-ps.purs
     easy-ps.spago
     pkgs.gjs
-    pkgs.gnome3.gtk
+    pkgs.gtk4
     pkgs.gnome3.gobject-introspection
   ];
 }

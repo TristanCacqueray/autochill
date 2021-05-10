@@ -1,0 +1,10 @@
+{
+  "description": "Help you chill by setting up breath time",
+  "name": "autochill",
+  "shell-version": [
+    "40.0"
+  ],
+  "url": "https://github.com/TristanCacqueray/autochill",
+  "uuid": "autochill@tristancacqueray.github.io",
+  "version": 1
+}

@@ -1,4 +1,4 @@
-module AutoChill.Prefs where
+module AutoChill.Prefs (init, buildPrefsWidget, main) where
 
 import Prelude
 
@@ -10,10 +10,21 @@ import Data.Traversable (traverse_)
 import Effect (Effect)
 import GJS as GJS
 import Gtk as Gtk
+import Gtk.Box (Box)
 import Gtk.Box as Box
 import Gtk.DrawingArea as DrawingArea
 import Gtk.Widget as Widget
 import Gtk.Window as Window
+
+init :: Effect Unit
+init = do
+  GJS.log "pref init called"
+  Gtk.init
+
+buildPrefsWidget :: Effect Box
+buildPrefsWidget = do
+  GJS.log "buildPrefsWidget called"
+  mkPrefWidget
 
 graphX = 500.0
 graphY = 500.0
@@ -69,6 +80,16 @@ drawCurve cr = do
           x' = padding + xn * maxX'
        in Cairo.lineTo cr x' y'
 
+mkPrefWidget :: Effect Box
+mkPrefWidget = do
+  drawing <- DrawingArea.new
+  DrawingArea.connectDraw drawing drawCurve
+  Widget.set_size_request drawing (round graphX) (round graphY)
+
+  box <- Box.new
+  Box.pack_start box drawing true true 0
+  pure box
+
 
 main :: Effect Unit
 main = do
@@ -78,13 +99,8 @@ main = do
   win <- Window.new
   Window.connectDelete win Gtk.main_quit
 
-  drawing <- DrawingArea.new
-  DrawingArea.connectDraw drawing drawCurve
-  Widget.set_size_request drawing (round graphX) (round graphY)
+  prefWidget <- mkPrefWidget
 
-  box <- Box.new
-  Box.pack_start box drawing true true 0
-
-  Window.add win box
+  Window.add win prefWidget
   Window.show_all win
   Gtk.main
