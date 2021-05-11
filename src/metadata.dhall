@@ -1,17 +1,10 @@
-let info =
-      { name = "autochill"
-      , description = "Help you chill by setting up breath time"
-      , version = 1
-      , url = "https://github.com/TristanCacqueray/autochill"
-      }
+-- | The extension metadata
+let extension = ../extension.dhall
 
-let metadata =
-      { uuid = "${info.name}@tristancacqueray.github.io"
-      , name = info.name
-      , description = info.description
-      , version = info.version
-      , shell-version = [ "40.0" ]
-      , url = info.url
-      }
-
-in  { info, metadata }
+in  { uuid = "${extension.name}@${extension.domain}"
+    , name = extension.name
+    , description = extension.description
+    , version = extension.version
+    , shell-version = [ "40.0" ]
+    , url = extension.url
+    }
