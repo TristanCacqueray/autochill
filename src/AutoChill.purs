@@ -3,6 +3,9 @@ module AutoChill where
 import Prelude
 import Effect (Effect)
 import GJS (log)
+import GLib as GLib
+import AutoChill.Worker
+import AutoChill.Settings
 
 type Env = Unit
 
@@ -17,6 +20,10 @@ disable env = do
 enable :: Env -> Effect Unit
 enable env = do
   log "enable called"
+  settings <- getSettings
+  _ <- autoChillWorker settings
+  log "enabled"
+
 
 init :: Env -> Effect Unit
 init env = do

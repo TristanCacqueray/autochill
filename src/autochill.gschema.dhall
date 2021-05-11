@@ -13,12 +13,12 @@ let schema =
         , content =
           [ Prelude.XML.element
               { name = "key"
-              , attributes = toMap { name = "show-indicator", type = "b" }
+              , attributes = toMap { name = "duration", type = "i" }
               , content =
                 [ Prelude.XML.element
                     { name = "default"
                     , attributes = Prelude.XML.emptyAttributes
-                    , content = [ Prelude.XML.text "true" ]
+                    , content = [ Prelude.XML.text "45" ]
                     }
                 ]
               }

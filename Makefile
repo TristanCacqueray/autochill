@@ -9,7 +9,7 @@ test:
 
 .PHONY: test-prefs
 test-prefs:
-	spago bundle-app -m AutoChill.Prefs --to build/prefs.js --then "gjs build/prefs.js"
+	spago bundle-app -m AutoChill.PrefsWidget --to build/prefs.js --then "gjs build/prefs.js"
 
 .PHONY: dist
 dist: dist-meta dist-extension dist-prefs
