@@ -1,26 +1,26 @@
 -- | The autochill entrypoint
 module AutoChill where
 
-import Prelude
 import AutoChill.PrefsWidget (mkPrefWidget)
 import AutoChill.Settings (getSettings, getSettingsFromPath)
 import AutoChill.Worker (autoChillWorker)
+import AutoChill.PanelMenu (setupPanelMenu)
+import AutoChill.Env (Env, createEnv, disableEnv)
 import Effect (Effect)
+import ShellUI.Main as UI
 import GJS (log)
 import GJS as GJS
 import GLib.MainLoop as GLib.MainLoop
-import Gio.Settings (Settings)
 import GObject as GObject
+import Gio.Settings (Settings)
 import Gtk4 as Gtk
 import Gtk4.Application as Application
 import Gtk4.Window as Window
-
-type Env
-  = Unit
+import Prelude
 
 -- | Create the extension environment, to be shared by enable/disable
 create :: Effect Env
-create = pure mempty
+create = createEnv
 
 -- | The extension init phase
 init :: Env -> Effect Unit
@@ -32,13 +32,16 @@ enable :: Env -> Effect Unit
 enable env = do
   log "enable called"
   settings <- getSettings
+  setupPanelMenu env
   -- _ <- autoChillWorker settings
-  log "enabled"
+  UI.notify "AutoChill engaged" ""
 
 -- | Disable the extension
 disable :: Env -> Effect Unit
 disable env = do
   log "disable called"
+  disableEnv env
+  UI.notify "AutoChill disabled" ""
 
 -- | Standalone gtk4 setup
 gtkApp :: String -> (GLib.MainLoop.Loop -> Settings -> Effect Unit) -> Effect Unit
