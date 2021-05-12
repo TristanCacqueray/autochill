@@ -14,6 +14,7 @@ import Prelude
 chillWindow :: Window.Window -> Effect Unit -> Effect Unit -> Effect Unit
 chillWindow win onChilled onSnooze = do
   Window.set_title win "AutoChill"
+  Window.set_decorated win false
   box <- Box.new 1 5.0
   label <- Label.new "Time for a break?"
   Box.append box label
