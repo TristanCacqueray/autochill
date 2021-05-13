@@ -1,13 +1,16 @@
 -- | The autochill entrypoint
 module AutoChill where
 
+import AutoChill.Env (Env, createEnv)
+import AutoChill.PanelMenu (addPanelMenu, removePanelMenu)
 import AutoChill.PrefsWidget (mkPrefWidget)
 import AutoChill.Settings (getSettings, getSettingsFromPath)
-import AutoChill.Worker (autoChillWorker)
-import AutoChill.PanelMenu (setupPanelMenu)
-import AutoChill.Env (Env, createEnv, disableEnv)
+import AutoChill.UIClutter as UIClutter
+import AutoChill.UIGtk4 as UIGtk4
+import AutoChill.Worker (autoChillWorker, stopChillWorker)
+import Data.Maybe
 import Effect (Effect)
-import ShellUI.Main as UI
+import Effect.Ref as Ref
 import GJS (log)
 import GJS as GJS
 import GLib.MainLoop as GLib.MainLoop
@@ -17,6 +20,7 @@ import Gtk4 as Gtk
 import Gtk4.Application as Application
 import Gtk4.Window as Window
 import Prelude
+import ShellUI.Main as UI
 
 -- | Create the extension environment, to be shared by enable/disable
 create :: Effect Env
@@ -26,21 +30,31 @@ create = createEnv
 init :: Env -> Effect Unit
 init env = do
   log "init called"
+  UIClutter.init env
 
 -- | Enable the extension
 enable :: Env -> Effect Unit
 enable env = do
   log "enable called"
+  UIClutter.add env
   settings <- getSettings
-  setupPanelMenu env
-  -- _ <- autoChillWorker settings
-  UI.notify "AutoChill engaged" ""
+  addPanelMenu env
+  widgetM <- Ref.read env.ui
+  case widgetM of
+    Just widget -> do
+      autoChillWorker env widget env.reset debugMode settings
+      UI.notify "AutoChill engaged" ""
+    Nothing -> log "oops, empty widget"
+  where
+  debugMode = false
 
 -- | Disable the extension
 disable :: Env -> Effect Unit
 disable env = do
   log "disable called"
-  disableEnv env
+  UIClutter.remove env
+  removePanelMenu env
+  stopChillWorker env
   UI.notify "AutoChill disabled" ""
 
 -- | Standalone gtk4 setup
@@ -70,7 +84,11 @@ mainPrefs = gtkApp "autochill.prefs" activate
 standalone :: Boolean -> Effect Unit
 standalone debug = gtkApp "autochille.standalone" activate
   where
-  activate _loop settings = void $ autoChillWorker debug settings
+  activate _loop settings = do
+    env <- createEnv
+    reset <- Ref.new false
+    widget <- UIGtk4.mkWidget
+    autoChillWorker env widget reset debug settings
 
 -- | CLI entrypoint
 main :: Effect Unit

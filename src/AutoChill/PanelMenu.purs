@@ -1,22 +1,24 @@
+-- | The GNOME shell panel menu
 module AutoChill.PanelMenu where
 
-import Prelude
-import Effect.Ref (write)
+import AutoChill.Env (Env)
+import Clutter.Actor as Actor
+import Clutter.Actor as Actor
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
-import AutoChill.Env (Env)
+import Effect.Ref (read, write)
+import GJS (log)
+import Gio.ThemedIcon as ThemedIcon
+import Prelude
 import ShellUI.Main.Panel as Panel
 import ShellUI.PanelMenu as PanelMenu
 import ShellUI.PopupMenu as PopupMenu
-import Gio.ThemedIcon as ThemedIcon
 import St as St
-import St.Label as St.Label
 import St.Icon as St.Icon
-import Clutter.Actor as Actor
-import GJS (log)
+import St.Label as St.Label
 
-setupPanelMenu :: Env -> Effect Unit
-setupPanelMenu env = do
+addPanelMenu :: Env -> Effect Unit
+addPanelMenu env = do
   button <- PanelMenu.newButton 0.0 "AutoChill" false
   write (Just button) env.button
   -- icon <- St.newIcon "weather-snow-symbolic" "system-status-icon"
@@ -27,10 +29,19 @@ setupPanelMenu env = do
   Actor.add_child button icon
   menuItem <- PopupMenu.newItem ""
   PopupMenu.connectActivate menuItem onClick
-  label <- St.Label.new "Reset"
+  label <- St.Label.new "Restart"
   Actor.add_child menuItem label
   PanelMenu.addMenuItem button menuItem
   Panel.addToStatusArea "autochill" button
   where
   onClick = do
-    log "Clicked!"
+    log "Restart"
+    write true env.reset
+
+removePanelMenu :: Env -> Effect Unit
+removePanelMenu env = do
+  buttonM <- read env.button
+  case buttonM of
+    Just button -> Actor.destroy button
+    Nothing -> log "[E] Button is undefined"
+  write Nothing env.button

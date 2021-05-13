@@ -7,9 +7,9 @@ in  { name = "autochill"
     , url = "https://github.com/TristanCacqueray/autochill"
     , options =
       [ config.intOption "duration" 45
-      , config.intOption "work-temp" 4000
-      , config.intOption "chill-temp" 2000
-      , config.floatOption "cutoff" 0.75
-      , config.floatOption "slope" 16.2
+      , config.intOption "work-temp" 3500
+      , config.intOption "chill-temp" 3000
+      , config.floatOption "cutoff" 0.8
+      , config.floatOption "slope" 18.3
       ]
     }

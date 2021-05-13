@@ -2,17 +2,18 @@ module AutoChill.Worker where
 
 import Prelude
 import AutoChill.Curve (chillTemperature)
-import AutoChill.Dialog (chillWindow)
-import AutoChill.DBus (isScreenLock, getIdleTime)
+-- import AutoChill.UIGtk4 (chillWindow, chillDialog)
+import AutoChill.DBus (isScreenLocked, getIdleTime)
 import Data.Int (round, toNumber)
+import Data.Maybe (Maybe(..))
+import Effect.Ref (Ref, write, read, new)
 import Effect (Effect)
 import GJS as GJS
 import GLib as GLib
 import GLib.DateTime as DateTime
 import GLib.Variant as Variant
 import Gio.Settings as Settings
-import Gtk4 as Gtk4
-import Gtk4.Window as Window
+import AutoChill.Env (Env, class AutoChillWidget, widget_show, widget_handler)
 
 setColor :: Settings.Settings -> Int -> Effect Unit
 setColor colorSettings value = do
@@ -28,17 +29,23 @@ enableNightLight colorSettings = do
   r' <- Settings.set_value colorSettings "night-light-schedule-to" v'
   GJS.log $ "Activating night light"
 
-autoChillWorker :: Boolean -> Settings.Settings -> Effect Unit
-autoChillWorker debug settings = do
+stopChillWorker :: Env -> Effect Unit
+stopChillWorker env = do
+  timerM <- read env.timer
+  case timerM of
+    Just timer -> GLib.sourceRemove timer
+    Nothing -> GJS.log "Oops, empty timer"
+
+autoChillWorker :: forall widget. AutoChillWidget widget => Env -> widget -> Ref Boolean -> Boolean -> Settings.Settings -> Effect Unit
+autoChillWorker env widget resetRef debug settings = do
   colorSettings <- Settings.new "org.gnome.settings-daemon.plugins.color"
-  dialog <- Window.new
-  chillWindow dialog (onChilled colorSettings dialog) (onSnooze colorSettings dialog)
+  widget_handler widget (onChilled colorSettings) (onSnooze colorSettings)
   unless debug $ enableNightLight colorSettings
   startTime <- DateTime.getUnix
-  if debug then
-    Gtk4.show dialog
+  if debug then do
+    widget_show widget
   else
-    void $ startAutoChill colorSettings startTime dialog
+    startAutoChill colorSettings startTime
   where
   -- in debug mode, a minute is 1 second
   minute_sec = if debug then 1 else 60
@@ -49,31 +56,41 @@ autoChillWorker debug settings = do
 
   snoozeDelay = 5 * minute_msec
 
-  startAutoChill colorSettings startTime dialog = GLib.timeoutAdd 1000 (go colorSettings startTime dialog)
+  startAutoChill colorSettings startTime = do
+    write false resetRef
+    screenLockedRef <- new false
+    idleTimeRef <- new 0
+    timer <- GLib.timeoutAdd 1000 (go screenLockedRef idleTimeRef colorSettings startTime)
+    write (Just timer) env.timer
+    pure unit
 
-  onChilled colorSettings dialog = do
+  onChilled colorSettings = do
     GJS.log "Ah darn, here we go again"
     startTime' <- DateTime.getUnix
-    void $ startAutoChill colorSettings startTime' dialog
+    void $ startAutoChill colorSettings startTime'
 
-  onSnooze colorSettings dialog = do
+  onSnooze colorSettings = do
     GJS.log $ "Asking again in " <> show snoozeDelay
     void
       $ GLib.timeoutAdd snoozeDelay
           ( do
-              Gtk4.show dialog
+              widget_show widget
               pure false
           )
 
-  go colorSettings startTime dialog = do
+  go screenLockedRef idleTimeRef colorSettings startTime = do
     now <- DateTime.getUnix
+    -- todo: cancel running dbus request...
+    isScreenLocked screenLockedRef
+    getIdleTime idleTimeRef
     durationSeconds <- getSetting "duration"
     startTemp <- getSetting "work-temp"
     endTemp <- getSetting "chill-temp"
     slope <- getCurveSetting "slope"
     cutoff <- getCurveSetting "cutoff"
-    screenLocked <- isScreenLock
-    idleTime <- getIdleTime
+    screenLocked <- read screenLockedRef
+    idleTime <- read idleTimeRef
+    reset <- read resetRef
     let
       duration = durationSeconds * (toNumber minute_sec)
 
@@ -87,17 +104,19 @@ autoChillWorker debug settings = do
 
       idle = idleTime > maxIdleTime
 
-      shouldStop = elapsed >= duration || screenLocked || idle
+      shouldStop = elapsed >= duration || screenLocked || idle || reset
     GJS.log
       $ "AutoChill running for "
       <> (show elapsed <> " sec (" <> show elapsedNorm <> ") ")
+      <> (" idle: " <> show idleTime)
       <> " temp: "
       <> (show newTemp <> " (" <> show newTempNorm <> ") ")
       <> (if screenLocked then " screenlocked" else "")
       <> (if idle then " idle" else "")
     if shouldStop then do
       unless debug $ setColor colorSettings (round newTemp)
-      Gtk4.show dialog
+      write false resetRef
+      widget_show widget
       pure false
     else
       pure true
