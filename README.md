@@ -10,13 +10,13 @@ Autochill progressively warms up your screen light temperature and it prompts yo
 Run the standalone CLI:
 
 ```ShellSession
-$ gjs ./dist/extension.js --run
+$ gjs ./autochill@tristancacqueray.github.io/extension.js --run
 ```
 
 Configure the standalone CLI:
 
 ```ShellSession
-$ gjs ./dist/extension.js --prefs
+$ gjs ./autochill@tristancacqueray.github.io/extension.js --prefs
 ```
 
 > TODO: insert pref widget screenshot

@@ -61,7 +61,7 @@ disable env = do
 -- | Standalone gtk4 setup
 gtkApp :: String -> (GLib.MainLoop.Loop -> Settings -> Effect Unit) -> Effect Unit
 gtkApp appName activate = do
-  settings <- getSettingsFromPath "./dist/schemas"
+  settings <- getSettingsFromPath "./autochill@tristancacqueray.github.io/schemas"
   loop <- GLib.MainLoop.new
   app <- Application.new appName
   _ <- GObject.signal_connect_closure app "activate" (activate loop settings)
