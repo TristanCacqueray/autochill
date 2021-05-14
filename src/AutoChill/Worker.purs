@@ -6,14 +6,15 @@ import AutoChill.Curve (chillTemperature)
 import AutoChill.DBus (isScreenLocked, getIdleTime)
 import Data.Int (round, toNumber)
 import Data.Maybe (Maybe(..))
-import Effect.Ref (Ref, write, read, new)
+import Effect.Ref as Ref
 import Effect (Effect)
 import GJS as GJS
 import GLib as GLib
 import GLib.DateTime as DateTime
 import GLib.Variant as Variant
+import Gio.Cancellable as Cancellable
 import Gio.Settings as Settings
-import AutoChill.Env (Env, class AutoChillWidget, widget_show, widget_handler)
+import AutoChill.Env (Env)
 
 setColor :: Settings.Settings -> Int -> Effect Unit
 setColor colorSettings value = do
@@ -31,24 +32,35 @@ enableNightLight colorSettings = do
 
 stopChillWorker :: Env -> Effect Unit
 stopChillWorker env = do
-  timerM <- read env.timer
+  timerM <- Ref.read env.timer
   case timerM of
     Just timer -> GLib.sourceRemove timer
     Nothing -> GJS.log "Oops, empty timer"
 
-autoChillWorker :: forall widget. AutoChillWidget widget => Env -> widget -> Ref Boolean -> Boolean -> Settings.Settings -> Effect Unit
-autoChillWorker env widget resetRef debug settings = do
-  colorSettings <- Settings.new "org.gnome.settings-daemon.plugins.color"
-  widget_handler widget (onChilled colorSettings) (onSnooze colorSettings)
-  unless debug $ enableNightLight colorSettings
+autoChillWorker :: Env -> Effect Unit -> Effect Unit
+autoChillWorker env show_dialog = do
+  GJS.log "Ah darn, here we go again"
+  unless env.debug $ enableNightLight env.colorSettings
   startTime <- DateTime.getUnix
-  if debug then do
-    widget_show widget
-  else
-    startAutoChill colorSettings startTime
+  lastTimeRef <- Ref.new startTime
+  cancellable <- Cancellable.new
+  -- ensure reset is unset
+  Ref.write false env.reset
+  -- initialize dbus values
+  screenLockedRef <- Ref.new false
+  idleTimeRef <- Ref.new 0
+  -- grab settings instance
+  settingsM <- Ref.read env.settings
+  -- TODO: remove any running timer
+  case settingsM of
+    Just settings -> do
+      timer <- GLib.timeoutAdd 1000 (go settings screenLockedRef idleTimeRef startTime lastTimeRef cancellable)
+      Ref.write (Just timer) env.timer
+      pure unit
+    Nothing -> pure unit
   where
   -- in debug mode, a minute is 1 second
-  minute_sec = if debug then 1 else 60
+  minute_sec = if env.debug then 1 else 60
 
   minute_msec = minute_sec * 1000
 
@@ -56,41 +68,20 @@ autoChillWorker env widget resetRef debug settings = do
 
   snoozeDelay = 5 * minute_msec
 
-  startAutoChill colorSettings startTime = do
-    write false resetRef
-    screenLockedRef <- new false
-    idleTimeRef <- new 0
-    timer <- GLib.timeoutAdd 1000 (go screenLockedRef idleTimeRef colorSettings startTime)
-    write (Just timer) env.timer
-    pure unit
-
-  onChilled colorSettings = do
-    GJS.log "Ah darn, here we go again"
-    startTime' <- DateTime.getUnix
-    void $ startAutoChill colorSettings startTime'
-
-  onSnooze colorSettings = do
-    GJS.log $ "Asking again in " <> show snoozeDelay
-    void
-      $ GLib.timeoutAdd snoozeDelay
-          ( do
-              widget_show widget
-              pure false
-          )
-
-  go screenLockedRef idleTimeRef colorSettings startTime = do
+  go settings screenLockedRef idleTimeRef startTime lastTimeRef cancellable = do
     now <- DateTime.getUnix
     -- todo: cancel running dbus request...
-    isScreenLocked screenLockedRef
-    getIdleTime idleTimeRef
+    isScreenLocked cancellable screenLockedRef
+    getIdleTime cancellable idleTimeRef
     durationSeconds <- getSetting "duration"
     startTemp <- getSetting "work-temp"
     endTemp <- getSetting "chill-temp"
     slope <- getCurveSetting "slope"
     cutoff <- getCurveSetting "cutoff"
-    screenLocked <- read screenLockedRef
-    idleTime <- read idleTimeRef
-    reset <- read resetRef
+    screenLocked <- Ref.read screenLockedRef
+    idleTime <- Ref.read idleTimeRef
+    lastTime <- Ref.read lastTimeRef
+    reset <- Ref.read env.reset
     let
       duration = durationSeconds * (toNumber minute_sec)
 
@@ -104,23 +95,27 @@ autoChillWorker env widget resetRef debug settings = do
 
       idle = idleTime > maxIdleTime
 
-      shouldStop = elapsed >= duration || screenLocked || idle || reset
+      asleep = now - lastTime > 600
+
+      shouldStop = elapsed >= duration || screenLocked || idle || reset || asleep
     GJS.log
       $ "AutoChill running for "
-      <> (show elapsed <> " sec (" <> show elapsedNorm <> ") ")
+      <> (show elapsed <> " sec ( remaining: " <> show (duration - elapsed) <> ") ")
       <> (" idle: " <> show idleTime)
-      <> " temp: "
-      <> (show newTemp <> " (" <> show newTempNorm <> ") ")
+      <> (" temp: " <> show newTemp)
       <> (if screenLocked then " screenlocked" else "")
       <> (if idle then " idle" else "")
+      <> (if asleep then " asleep" else "")
     if shouldStop then do
-      unless debug $ setColor colorSettings (round newTemp)
-      write false resetRef
-      widget_show widget
+      Cancellable.cancel cancellable
+      Ref.write false env.reset
+      show_dialog
       pure false
-    else
+    else do
+      unless env.debug $ setColor env.colorSettings (round newTemp)
+      Ref.write now lastTimeRef
       pure true
+    where
+    getCurveSetting name = Settings.get_double settings name
 
-  getCurveSetting name = Settings.get_double settings name
-
-  getSetting name = toNumber <$> Settings.get_int settings name
+    getSetting name = toNumber <$> Settings.get_int settings name

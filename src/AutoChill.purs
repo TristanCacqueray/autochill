@@ -8,7 +8,7 @@ import AutoChill.Settings (getSettings, getSettingsFromPath)
 import AutoChill.UIClutter as UIClutter
 import AutoChill.UIGtk4 as UIGtk4
 import AutoChill.Worker (autoChillWorker, stopChillWorker)
-import Data.Maybe
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Ref as Ref
 import GJS (log)
@@ -24,7 +24,7 @@ import ShellUI.Main as UI
 
 -- | Create the extension environment, to be shared by enable/disable
 create :: Effect Env
-create = createEnv
+create = createEnv false
 
 -- | The extension init phase
 init :: Env -> Effect Unit
@@ -38,11 +38,12 @@ enable env = do
   log "enable called"
   UIClutter.add env
   settings <- getSettings
+  Ref.write (Just settings) env.settings
   addPanelMenu env
   widgetM <- Ref.read env.ui
   case widgetM of
     Just widget -> do
-      autoChillWorker env widget env.reset debugMode settings
+      autoChillWorker env (UIClutter.showWidget widget)
       UI.notify "AutoChill engaged" ""
     Nothing -> log "oops, empty widget"
   where
@@ -85,10 +86,14 @@ standalone :: Boolean -> Effect Unit
 standalone debug = gtkApp "autochille.standalone" activate
   where
   activate _loop settings = do
-    env <- createEnv
+    env <- createEnv debug
     reset <- Ref.new false
-    widget <- UIGtk4.mkWidget
-    autoChillWorker env widget reset debug settings
+    widget <- UIGtk4.mkWidget env
+    Ref.write (Just settings) env.settings
+    if env.debug then
+      UIGtk4.showWidget widget
+    else
+      autoChillWorker env (UIGtk4.showWidget widget)
 
 -- | CLI entrypoint
 main :: Effect Unit

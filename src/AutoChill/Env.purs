@@ -1,50 +1,34 @@
-module AutoChill.Env (Env, createEnv, class AutoChillWidget, widget_show, widget_handler, Widget(..)) where
+module AutoChill.Env (Env, createEnv) where
 
-import Clutter.Actor as Actor
 import Data.Maybe (Maybe(..))
 import ShellUI.PanelMenu as PanelMenu
 import Effect (Effect)
 import Effect.Ref (Ref, new)
 import Prelude
-import St.Bin (Bin)
-import St.Button (Button)
-import GJS as GJS
+import Gio.Settings as Settings
 import GLib as GLib
-
-data Widget
-  = Widget
-    { bin :: Bin
-    , chillButton :: Button
-    , snoozeButton :: Button
-    }
-
-instance autoChillWidget :: AutoChillWidget Widget where
-  widget_show (Widget widget) = Actor.show widget.bin
-  widget_handler (Widget widget) onChilled onSnooze = do
-    Actor.onButtonPressEvent widget.chillButton (closeButton onChilled)
-    Actor.onButtonPressEvent widget.snoozeButton (closeButton onSnooze)
-    pure unit
-    where
-    closeButton action _ _ev = do
-      Actor.hide widget.bin
-      action
-      pure true
+import St.Bin (Bin)
 
 type Env
   = { button :: Ref (Maybe PanelMenu.Button)
+    , ui :: Ref (Maybe Bin)
     , reset :: Ref Boolean
-    , ui :: Ref (Maybe Widget)
     , timer :: Ref (Maybe GLib.EventSourceId)
+    , settings :: Ref (Maybe Settings.Settings)
+    , colorSettings :: Settings.Settings
+    , snoozeDelay :: Int
+    , debug :: Boolean
     }
 
 class AutoChillWidget a where
-  widget_show :: a -> Effect Unit
   widget_handler :: a -> Effect Unit -> Effect Unit -> Effect Unit
 
-createEnv :: Effect Env
-createEnv = do
-  ui <- new Nothing
+createEnv :: Boolean -> Effect Env
+createEnv debug = do
   button <- new Nothing
+  ui <- new Nothing
   reset <- new false
   timer <- new Nothing
-  pure { button, reset, ui, timer }
+  settings <- new Nothing
+  colorSettings <- Settings.new "org.gnome.settings-daemon.plugins.color"
+  pure { button, ui, reset, timer, settings, colorSettings, snoozeDelay: 5000, debug }

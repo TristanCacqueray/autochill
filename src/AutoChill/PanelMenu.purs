@@ -3,7 +3,6 @@ module AutoChill.PanelMenu where
 
 import AutoChill.Env (Env)
 import Clutter.Actor as Actor
-import Clutter.Actor as Actor
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Ref (read, write)

@@ -1,40 +1,44 @@
 -- | The autochill clutter ui
-module AutoChill.UIClutter (init, add, remove) where
+module AutoChill.UIClutter (init, showWidget, add, remove) where
 
 import Prelude
-
+import AutoChill.Env (Env)
+import AutoChill.Worker (autoChillWorker)
 import Clutter.Actor as Actor
 import Clutter.BoxLayout as Clutter.BoxLayout
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Ref as Ref
 import GJS as GJS
+import GLib as GLib
 import ShellUI.Main as UI
 import St as St
+import St.Bin (Bin)
 import St.Bin as St.Bin
 import St.BoxLayout as St.BoxLayout
 import St.Button as St.Button
 import St.Label as St.Label
 
-import AutoChill.Env (Env, Widget(..))
-
 init :: Env -> Effect Unit
 init env = do
-  widget <- mkWidget
+  widget <- mkWidget env
   Ref.write (Just widget) env.ui
+
+showWidget :: Bin -> Effect Unit
+showWidget bin = Actor.show bin
 
 add :: Env -> Effect Unit
 add env = do
   uiM <- Ref.read env.ui
   case uiM of
-    Just (Widget ui) -> UI.addTopChrome ui.bin
+    Just ui -> UI.addTopChrome ui
     Nothing -> pure unit
 
 remove :: Env -> Effect Unit
 remove env = do
   uiM <- Ref.read env.ui
   case uiM of
-    Just (Widget ui) -> UI.removeChrome ui.bin
+    Just ui -> UI.removeChrome ui
     Nothing -> GJS.log "[E] ui is undefined"
 
 solarColor :: String
@@ -48,8 +52,8 @@ button label = do
   St.set_style but $ Just solarColor
   pure but
 
-mkWidget :: Effect Widget
-mkWidget = do
+mkWidget :: Env -> Effect Bin
+mkWidget env = do
   bin <- St.Bin.new
   Actor.set_position bin 10.0 100.0
   -- Actor.set_size bin 150.0 80.0
@@ -71,12 +75,26 @@ mkWidget = do
   --
   chillButton <- button "I feel chilled"
   Actor.add_child actionBox chillButton
-  -- Actor.onButtonPressEvent chillButton cb
+  Actor.onButtonPressEvent chillButton (onClick bin $ const $ autoChillWorker env (Actor.show bin))
   --
   snoozeButton <- button "Snooze"
   Actor.add_child actionBox snoozeButton
-  -- Actor.onButtonPressEvent snoozeButton cb
+  Actor.onButtonPressEvent snoozeButton (onClick bin snooze)
   --
   St.Bin.set_child bin box
   Actor.hide bin
-  pure $ Widget {bin, chillButton, snoozeButton}
+  pure bin
+  where
+  onClick bin action _actor _ev = do
+    Actor.hide bin
+    action bin
+    pure true
+
+  snooze bin = do
+    GJS.log $ "Snoozing for " <> show env.snoozeDelay
+    void
+      $ GLib.timeoutAdd env.snoozeDelay
+          ( do
+              Actor.show bin
+              pure false
+          )
