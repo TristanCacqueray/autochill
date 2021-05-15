@@ -2,6 +2,8 @@
 module AutoChill.PanelMenu where
 
 import AutoChill.Env (Env)
+import AutoChill.Worker as Worker
+import AutoChill.UIClutter as UIClutter
 import Clutter.Actor as Actor
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
@@ -35,7 +37,12 @@ addPanelMenu env = do
   where
   onClick = do
     log "Restart"
-    write true env.reset
+    Worker.stopChillWorker env
+    widgetM <- read env.ui
+    case widgetM of
+      Just widget -> do
+        Worker.autoChillWorker env (UIClutter.showWidget widget)
+      Nothing -> log "oops, empty widget"
 
 removePanelMenu :: Env -> Effect Unit
 removePanelMenu env = do

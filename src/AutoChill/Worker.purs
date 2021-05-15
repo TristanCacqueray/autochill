@@ -2,8 +2,7 @@ module AutoChill.Worker where
 
 import Prelude
 import AutoChill.Curve (chillTemperature)
--- import AutoChill.UIGtk4 (chillWindow, chillDialog)
-import AutoChill.DBus (isScreenLocked, getIdleTime)
+import AutoChill.DBus (getIdleTime)
 import Data.Int (round, toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Ref as Ref
@@ -32,30 +31,54 @@ enableNightLight colorSettings = do
 
 stopChillWorker :: Env -> Effect Unit
 stopChillWorker env = do
-  timerM <- Ref.read env.timer
-  case timerM of
-    Just timer -> GLib.sourceRemove timer
-    Nothing -> GJS.log "Oops, empty timer"
+  cancellableM <- Ref.read env.cancellable
+  case cancellableM of
+    Just cancellable -> do
+      Cancellable.cancel cancellable
+      Ref.write Nothing env.cancellable
+    Nothing -> GJS.log "Oops, empty cancellable"
+  sourceRemoveM env.timerMain
+  sourceRemoveM env.timerDbus
+  where
+  sourceRemoveM ref = do
+    timerM <- Ref.read ref
+    case timerM of
+      Just timer -> GLib.sourceRemove timer
+      Nothing -> GJS.log "Oops, empty timer"
+    Ref.write Nothing ref
+
+startIdleWorker :: Env -> Effect Unit
+startIdleWorker env = do
+  timerDbusM <- Ref.read env.timerDbus
+  case timerDbusM of
+    Just timer -> do
+      GJS.log "Idle worker already running!"
+      GLib.sourceRemove timer
+    Nothing -> pure unit
+  cancellable <- Cancellable.new
+  Ref.write (Just cancellable) env.cancellable
+  timer <- GLib.timeoutAdd 5000 (go cancellable)
+  Ref.write (Just timer) env.timerDbus
+  where
+  go cancellable = do
+    getIdleTime cancellable env.idleTimeRef
+    pure true
 
 autoChillWorker :: Env -> Effect Unit -> Effect Unit
 autoChillWorker env show_dialog = do
   GJS.log "Ah darn, here we go again"
   unless env.debug $ enableNightLight env.colorSettings
+  startIdleWorker env
   startTime <- DateTime.getUnix
   lastTimeRef <- Ref.new startTime
-  cancellable <- Cancellable.new
-  -- ensure reset is unset
-  Ref.write false env.reset
-  -- initialize dbus values
-  screenLockedRef <- Ref.new false
-  idleTimeRef <- Ref.new 0
+  Ref.write 0 env.idleTimeRef
   -- grab settings instance
   settingsM <- Ref.read env.settings
   -- TODO: remove any running timer
   case settingsM of
     Just settings -> do
-      timer <- GLib.timeoutAdd 1000 (go settings screenLockedRef idleTimeRef startTime lastTimeRef cancellable)
-      Ref.write (Just timer) env.timer
+      timer <- GLib.timeoutAdd 1000 (go settings startTime lastTimeRef)
+      Ref.write (Just timer) env.timerMain
       pure unit
     Nothing -> pure unit
   where
@@ -68,20 +91,15 @@ autoChillWorker env show_dialog = do
 
   snoozeDelay = 5 * minute_msec
 
-  go settings screenLockedRef idleTimeRef startTime lastTimeRef cancellable = do
+  go settings startTime lastTimeRef = do
     now <- DateTime.getUnix
-    -- todo: cancel running dbus request...
-    isScreenLocked cancellable screenLockedRef
-    getIdleTime cancellable idleTimeRef
     durationSeconds <- getSetting "duration"
     startTemp <- getSetting "work-temp"
     endTemp <- getSetting "chill-temp"
     slope <- getCurveSetting "slope"
     cutoff <- getCurveSetting "cutoff"
-    screenLocked <- Ref.read screenLockedRef
-    idleTime <- Ref.read idleTimeRef
+    idleTime <- Ref.read env.idleTimeRef
     lastTime <- Ref.read lastTimeRef
-    reset <- Ref.read env.reset
     let
       duration = durationSeconds * (toNumber minute_sec)
 
@@ -97,18 +115,16 @@ autoChillWorker env show_dialog = do
 
       asleep = now - lastTime > 600
 
-      shouldStop = elapsed >= duration || screenLocked || idle || reset || asleep
+      shouldStop = elapsed >= duration || idle || asleep
     GJS.log
       $ "AutoChill running for "
       <> (show elapsed <> " sec ( remaining: " <> show (duration - elapsed) <> ") ")
       <> (" idle: " <> show idleTime)
       <> (" temp: " <> show newTemp)
-      <> (if screenLocked then " screenlocked" else "")
       <> (if idle then " idle" else "")
       <> (if asleep then " asleep" else "")
     if shouldStop then do
-      Cancellable.cancel cancellable
-      Ref.write false env.reset
+      stopChillWorker env
       show_dialog
       pure false
     else do
