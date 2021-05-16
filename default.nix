@@ -1,4 +1,6 @@
-{ pkgs ? import <nixpkgs> { } }:
+{ pkgs ? import (builtins.fetchTarball
+  "https://github.com/NixOS/nixpkgs/archive/c0e881852006b132236cbf0301bd1939bb50867e.tar.gz")
+  { } }:
 
 let
   easy-ps = import (pkgs.fetchFromGitHub {
@@ -15,5 +17,7 @@ in pkgs.mkShell {
     pkgs.gjs
     pkgs.gtk4
     pkgs.gnome3.gobject-introspection
+    pkgs.dhall
+    pkgs.dhall-json
   ];
 }
