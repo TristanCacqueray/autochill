@@ -29,11 +29,13 @@ To modify autochill, you will need a [PureScript][purescript] toolchain and the 
 Run the `nix-shell` command to setup.
 
 ```ShellSession
+# Ensure purescript-gjs is cloned in the parent directory
+git clone https://github.com/purescript-gjs/purescript-gjs ../purescript-gjs
 # Build javascript
-$ make dist
+make dist
 
 # Run a nested gnome-shell session
-$ make test
+make test
 ```
 
 Checkout the [purescript-gjs][purescript-gjs] bindings too.
