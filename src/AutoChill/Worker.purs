@@ -89,8 +89,6 @@ autoChillWorker env show_dialog = do
 
   maxIdleTime = 10 * minute_msec
 
-  snoozeDelay = 5 * minute_msec
-
   go settings startTime lastTimeRef = do
     now <- DateTime.getUnix
     durationSeconds <- getSetting "duration"

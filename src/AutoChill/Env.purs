@@ -50,7 +50,7 @@ createEnv debug = do
     , idleTimeRef
     , settings
     , colorSettings
-    , snoozeDelay: 5000
+    , snoozeDelay: 5000 * (if debug then 1 else 60)
     , debug
     , cancellable
     }
