@@ -1,27 +1,25 @@
 -- | The GNOME shell panel menu
-module AutoChill.PanelMenu where
+module AutoChill.PanelMenu (create, delete) where
 
-import AutoChill.Env (Env)
+import AutoChill.Env as Env
 import AutoChill.Worker as Worker
 import AutoChill.UIClutter as UIClutter
 import Clutter.Actor as Actor
-import Data.Maybe (Maybe(..))
 import Effect (Effect)
-import Effect.Ref (read, write)
 import GJS (log)
 import Gio.ThemedIcon as ThemedIcon
 import Prelude
-import ShellUI.Main.Panel as Panel
-import ShellUI.PanelMenu as PanelMenu
-import ShellUI.PopupMenu as PopupMenu
+import Gnome.UI.Main.Panel as Panel
+import Gnome.UI.PanelMenu as PanelMenu
+import Gnome.UI.PopupMenu as PopupMenu
 import St as St
+import St.Bin (Bin)
 import St.Icon as St.Icon
 import St.Label as St.Label
 
-addPanelMenu :: Env -> Effect Unit
-addPanelMenu env = do
+create :: Bin -> Env.Settings -> Env.Env -> Effect PanelMenu.Button
+create ui settings env = do
   button <- PanelMenu.newButton 0.0 "AutoChill" false
-  write (Just button) env.button
   -- icon <- St.newIcon "weather-snow-symbolic" "system-status-icon"
   gicon <- ThemedIcon.new "weather-snow-symbolic"
   icon <- St.Icon.new
@@ -34,20 +32,12 @@ addPanelMenu env = do
   Actor.add_child menuItem label
   PanelMenu.addMenuItem button menuItem
   Panel.addToStatusArea "autochill" button
+  pure button
   where
   onClick = do
     log "Restart"
     Worker.stopChillWorker env
-    widgetM <- read env.ui
-    case widgetM of
-      Just widget -> do
-        Worker.autoChillWorker env (UIClutter.showWidget widget)
-      Nothing -> log "oops, empty widget"
+    Worker.autoChillWorker settings env (UIClutter.showWidget ui)
 
-removePanelMenu :: Env -> Effect Unit
-removePanelMenu env = do
-  buttonM <- read env.button
-  case buttonM of
-    Just button -> Actor.destroy button
-    Nothing -> log "[E] Button is undefined"
-  write Nothing env.button
+delete :: PanelMenu.Button -> Effect Unit
+delete = Actor.destroy

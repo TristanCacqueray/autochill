@@ -1,4 +1,4 @@
-module AutoChill.Settings (getSettings, getSettingsFromPath) where
+module AutoChill.Settings (getColorSettings, getSettings, getSettingsFromPath) where
 
 import Prelude
 import Effect (Effect)
@@ -17,3 +17,6 @@ getSettings = do
   me <- ExtensionUtils.getCurrentExtension
   path <- ExtensionUtils.getPath me "schemas"
   getSettingsFromPath path
+
+getColorSettings :: Effect Settings.Settings
+getColorSettings = Settings.new "org.gnome.settings-daemon.plugins.color"

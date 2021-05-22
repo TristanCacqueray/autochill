@@ -1,17 +1,16 @@
 -- | The autochill clutter ui
-module AutoChill.UIClutter (init, showWidget, add, remove) where
+module AutoChill.UIClutter where -- (init, showWidget, add, remove) where
 
 import Prelude
-import AutoChill.Env (Env)
+import AutoChill.Env as Env
 import AutoChill.Worker (autoChillWorker)
 import Clutter.Actor as Actor
 import Clutter.BoxLayout as Clutter.BoxLayout
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
-import Effect.Ref as Ref
 import GJS as GJS
 import GLib as GLib
-import ShellUI.Main as UI
+import Gnome.UI.Main as UI
 import St as St
 import St.Bin (Bin)
 import St.Bin as St.Bin
@@ -19,27 +18,14 @@ import St.BoxLayout as St.BoxLayout
 import St.Button as St.Button
 import St.Label as St.Label
 
-init :: Env -> Effect Unit
-init env = do
-  widget <- mkWidget env
-  Ref.write (Just widget) env.ui
+add :: Bin -> Effect Unit
+add = UI.addTopChrome
+
+remove :: Bin -> Effect Unit
+remove = UI.removeChrome
 
 showWidget :: Bin -> Effect Unit
 showWidget bin = Actor.show bin
-
-add :: Env -> Effect Unit
-add env = do
-  uiM <- Ref.read env.ui
-  case uiM of
-    Just ui -> UI.addTopChrome ui
-    Nothing -> pure unit
-
-remove :: Env -> Effect Unit
-remove env = do
-  uiM <- Ref.read env.ui
-  case uiM of
-    Just ui -> UI.removeChrome ui
-    Nothing -> GJS.log "[E] ui is undefined"
 
 solarColor :: String
 solarColor = "background-color: #fdf6e3; color: #586e75;"
@@ -52,8 +38,8 @@ button label = do
   St.set_style but $ Just solarColor
   pure but
 
-mkWidget :: Env -> Effect Bin
-mkWidget env = do
+mkWidget :: Env.Settings -> Env.Env -> Effect Bin
+mkWidget settings env = do
   bin <- St.Bin.new
   Actor.set_position bin 10.0 100.0
   -- Actor.set_size bin 150.0 80.0
@@ -75,11 +61,11 @@ mkWidget env = do
   --
   chillButton <- button "I feel chilled"
   Actor.add_child actionBox chillButton
-  Actor.onButtonPressEvent chillButton (onClick bin $ const $ autoChillWorker env (Actor.show bin))
+  void $ Actor.onButtonPressEvent chillButton (onClick bin $ const $ autoChillWorker settings env (Actor.show bin))
   --
   snoozeButton <- button "Snooze"
   Actor.add_child actionBox snoozeButton
-  Actor.onButtonPressEvent snoozeButton (onClick bin snooze)
+  void $ Actor.onButtonPressEvent snoozeButton (onClick bin snooze)
   --
   St.Bin.set_child bin box
   Actor.hide bin

@@ -1,32 +1,37 @@
-DIST := "autochill@tristancacqueray.github.io"
+# TODO: replace dependency by a known location
+PGS := "~/src/github.com/purescript-gjs/purescript-gnome-shell/package.dhall"
 
-all: dist
+NAME := $(shell sh -c 'echo "($(PGS)).uid ./extension.dhall" | env PGS=$(PGS) dhall text')
+MAIN := $(shell sh -c 'echo "($(PGS)).main ./extension.dhall" | env PGS=$(PGS) dhall text')
+
+.PHONY: dist
+dist: dist-meta dist-schemas dist-extension
+
+.PHONY: dist-meta
+dist-meta:
+	mkdir -p $(NAME)
+	echo "($(PGS)).metadata ./extension.dhall" | env PGS=$(PGS) dhall-to-json --output $(NAME)/metadata.json
+
+.PHONY: dist-schemas
+dist-schemas:
+	mkdir -p $(NAME)/schemas
+	echo "($(PGS)).renderSchema ./extension.dhall" | env PGS=$(PGS) dhall text --output $(NAME)/schemas/autochill.gschema.xml
+	glib-compile-schemas $(NAME)/schemas/
+
+.PHONY: dist-extension
+dist-extension:
+	env PGS=$(PGS) spago bundle-app -m $(MAIN) --to $(NAME)/extension.js
+	echo "($(PGS)).boot ./extension.dhall" | env PGS=$(PGS) dhall text >> $(NAME)/extension.js
 
 .PHONY: install
 install:
 	mkdir -p ~/.local/share/gnome-shell/extensions/
-	ln -s $(PWD)/autochill@tristancacqueray.github.io/ ~/.local/share/gnome-shell/extensions/autochill@tristancacqueray.github.io
+	ln -s $(PWD)/$(NAME)/ ~/.local/share/gnome-shell/extensions/$(NAME)
 
 .PHONY: test
 test:
 	dbus-run-session -- gnome-shell --nested --wayland
 
-.PHONY: dist
-dist: dist-meta dist-extension dist-prefs
-
-.PHONY: dist-meta
-dist-meta:
-	mkdir -p $(DIST)/schemas
-	dhall-to-json --file ./src/metadata.dhall --output $(DIST)/metadata.json
-	dhall text --file ./src/autochill.gschema.dhall --output $(DIST)/schemas/autochill.gschema.xml
-	glib-compile-schemas $(DIST)/schemas/
-
-.PHONY: dist-extension
-dist-extension:
-	spago bundle-app -m AutoChill --to $(DIST)/extension.js
-	cat src/main-extension.js >> $(DIST)/extension.js
-
-.PHONY: dist-prefs
-dist-prefs:
-	spago bundle-app -m AutoChill.Prefs --to $(DIST)/prefs.js
-	cat src/main-prefs.js >> $(DIST)/prefs.js
+.PHONE: update
+update:
+	echo "($(PGS)).render ./extension.dhall" | env PGS=$(PGS) dhall to-directory-tree --output .

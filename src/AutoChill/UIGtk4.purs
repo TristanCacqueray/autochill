@@ -10,14 +10,14 @@ import Gtk4.Button as Button
 import Gtk4.Label as Label
 import Gtk4.Window as Window
 import AutoChill.Worker (autoChillWorker)
-import AutoChill.Env (Env)
+import AutoChill.Env as Env
 import Prelude
 
 showWidget :: Window.Window -> Effect Unit
 showWidget win = Gtk4.show win
 
-mkWidget :: Env -> Effect Window.Window
-mkWidget env = do
+mkWidget :: Env.Settings -> Env.Env -> Effect Window.Window
+mkWidget settings env = do
   win <- Window.new
   Window.set_title win "AutoChill"
   Window.set_decorated win false
@@ -40,7 +40,7 @@ mkWidget env = do
   where
   onChilled win = do
     Gtk4.hide win
-    autoChillWorker env (Gtk4.show win)
+    autoChillWorker settings env (Gtk4.show win)
     pure unit
 
   onSnooze win = do

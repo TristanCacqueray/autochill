@@ -1,15 +1,14 @@
-let config = ./src/config.dhall
-
-in  { name = "autochill"
-    , domain = "tristancacqueray.github.io"
-    , description = "Help you chill by setting up breath time"
-    , version = 0.1
-    , url = "https://github.com/TristanCacqueray/autochill"
-    , options =
-      [ config.intOption "duration" 45
-      , config.intOption "work-temp" 3500
-      , config.intOption "chill-temp" 3000
-      , config.floatOption "cutoff" 0.8
-      , config.floatOption "slope" 18.3
-      ]
-    }
+(env:PGS).Extension::{
+, name = "autochill"
+, module = "AutoChill"
+, description = "Help you chill by setting up breath time"
+, url = "https://github.com/TristanCacqueray/autochill"
+, domain = "tristancacqueray.github.io"
+, settings = Some
+  [ (env:PGS).intSetting "duration" 45
+  , (env:PGS).intSetting "work-temp" 3500
+  , (env:PGS).intSetting "chill-temp" 3000
+  , (env:PGS).floatSetting "cutoff" 0.8
+  , (env:PGS).floatSetting "slope" 18.3
+  ]
+}

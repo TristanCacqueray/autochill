@@ -13,23 +13,23 @@ import GLib.DateTime as DateTime
 import GLib.Variant as Variant
 import Gio.Cancellable as Cancellable
 import Gio.Settings as Settings
-import AutoChill.Env (Env)
+import AutoChill.Env as Env
 
 setColor :: Settings.Settings -> Int -> Effect Unit
 setColor colorSettings value = do
   v <- Variant.new_uint32 value
-  r <- Settings.set_value colorSettings "night-light-temperature" v
+  _ <- Settings.set_value colorSettings "night-light-temperature" v
   pure unit
 
 enableNightLight :: Settings.Settings -> Effect Unit
 enableNightLight colorSettings = do
   v <- Variant.new_double 0.0
-  r <- Settings.set_value colorSettings "night-light-schedule-from" v
+  _ <- Settings.set_value colorSettings "night-light-schedule-from" v
   v' <- Variant.new_double 24.0
-  r' <- Settings.set_value colorSettings "night-light-schedule-to" v'
+  _' <- Settings.set_value colorSettings "night-light-schedule-to" v'
   GJS.log $ "Activating night light"
 
-stopChillWorker :: Env -> Effect Unit
+stopChillWorker :: Env.Env -> Effect Unit
 stopChillWorker env = do
   cancellableM <- Ref.read env.cancellable
   case cancellableM of
@@ -47,7 +47,7 @@ stopChillWorker env = do
       Nothing -> GJS.log "Oops, empty timer"
     Ref.write Nothing ref
 
-startIdleWorker :: Env -> Effect Unit
+startIdleWorker :: Env.Env -> Effect Unit
 startIdleWorker env = do
   timerDbusM <- Ref.read env.timerDbus
   case timerDbusM of
@@ -64,23 +64,17 @@ startIdleWorker env = do
     getIdleTime cancellable env.idleTimeRef
     pure true
 
-autoChillWorker :: Env -> Effect Unit -> Effect Unit
-autoChillWorker env show_dialog = do
+autoChillWorker :: Env.Settings -> Env.Env -> Effect Unit -> Effect Unit
+autoChillWorker settings env show_dialog = do
   GJS.log "Ah darn, here we go again"
-  unless env.debug $ enableNightLight env.colorSettings
+  unless env.debug $ enableNightLight settings.colorSettings
   startIdleWorker env
   startTime <- DateTime.getUnix
   lastTimeRef <- Ref.new startTime
   Ref.write 0 env.idleTimeRef
-  -- grab settings instance
-  settingsM <- Ref.read env.settings
   -- TODO: remove any running timer
-  case settingsM of
-    Just settings -> do
-      timer <- GLib.timeoutAdd 1000 (go settings startTime lastTimeRef)
-      Ref.write (Just timer) env.timerMain
-      pure unit
-    Nothing -> pure unit
+  timer <- GLib.timeoutAdd 1000 (go startTime lastTimeRef)
+  Ref.write (Just timer) env.timerMain
   where
   -- in debug mode, a minute is 1 second
   minute_sec = if env.debug then 1 else 60
@@ -89,7 +83,7 @@ autoChillWorker env show_dialog = do
 
   maxIdleTime = 10 * minute_msec
 
-  go settings startTime lastTimeRef = do
+  go startTime lastTimeRef = do
     now <- DateTime.getUnix
     durationSeconds <- getSetting "duration"
     startTemp <- getSetting "work-temp"
@@ -126,10 +120,10 @@ autoChillWorker env show_dialog = do
       show_dialog
       pure false
     else do
-      unless env.debug $ setColor env.colorSettings (round newTemp)
+      unless env.debug $ setColor settings.colorSettings (round newTemp)
       Ref.write now lastTimeRef
       pure true
     where
-    getCurveSetting name = Settings.get_double settings name
+    getCurveSetting name = Settings.get_double settings.settings name
 
-    getSetting name = toNumber <$> Settings.get_int settings name
+    getSetting name = toNumber <$> Settings.get_int settings.settings name
