@@ -5,6 +5,8 @@ A gnome extension to help you chill by setting up breath time.
 
 Autochill progressively warms up your screen light temperature and it prompts you to take a break after some time.
 
+> As of gnome 45, the light temperature no longers work reliably
+
 # Usage
 
 Run the standalone CLI:
