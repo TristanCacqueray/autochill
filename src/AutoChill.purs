@@ -9,31 +9,32 @@ import AutoChill.UIClutter as UIClutter
 import AutoChill.UIGtk4 as UIGtk4
 import AutoChill.Worker (autoChillWorker, stopChillWorker)
 import Effect (Effect)
+import ExtensionUtils (ExtensionMetadata)
 import GJS as GJS
 import GLib.MainLoop as GLib.MainLoop
 import GObject as GObject
+import Gnome.Extension (Extension)
+import Gnome.UI.Main as UI
 import Gtk4 as Gtk
 import Gtk4.Application as Application
 import Gtk4.Window as Window
 import Prelude
-import Gnome.UI.Main as UI
-import Gnome.Extension (Extension)
 
 log :: String -> Effect Unit
 log msg = GJS.log $ "autochill: " <> msg
 
 extension :: Extension Env.Settings Env.UIEnv
-extension = { enable, disable, init }
+extension = { extension_enable, extension_disable, extension_init }
   where
-  init :: Effect Env.Settings
-  init = do
+  extension_init :: ExtensionMetadata -> Effect Env.Settings
+  extension_init me = do
     log "init called"
-    settings <- Settings.getSettings
+    settings <- Settings.getSettings me
     colorSettings <- Settings.getColorSettings
     pure { settings, colorSettings }
 
-  enable :: Env.Settings -> Effect Env.UIEnv
-  enable settings = do
+  extension_enable :: Env.Settings -> Effect Env.UIEnv
+  extension_enable settings = do
     log "enable called"
     env <- Env.createEnv false
     bin <- UIClutter.mkWidget settings env
@@ -43,8 +44,8 @@ extension = { enable, disable, init }
     UI.notify "AutoChill engaged" ""
     pure { env, bin, button }
 
-  disable :: Env.UIEnv -> Effect Unit
-  disable uiEnv = do
+  extension_disable :: Env.UIEnv -> Effect Unit
+  extension_disable uiEnv = do
     log "disable called"
     PanelMenu.delete uiEnv.button
     UIClutter.remove uiEnv.bin

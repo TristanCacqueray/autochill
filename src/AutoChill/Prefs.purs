@@ -3,6 +3,7 @@ module AutoChill.Prefs (main, init, buildPrefsWidget) where
 
 import Prelude
 
+import ExtensionUtils (ExtensionMetadata)
 import AutoChill.Settings (getSettings)
 import AutoChill.PrefsWidget (mkPrefWidget)
 import Effect (Effect)
@@ -15,8 +16,8 @@ main = pure mempty
 init :: Effect Unit
 init = pure mempty
 
-buildPrefsWidget :: Effect Box
-buildPrefsWidget = do
+buildPrefsWidget :: ExtensionMetadata -> Effect Box
+buildPrefsWidget me = do
   GJS.log "buildPrefsWidget called"
-  settings <- getSettings
+  settings <- getSettings me
   mkPrefWidget settings

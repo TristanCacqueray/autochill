@@ -1,10 +1,11 @@
 module AutoChill.Settings (getColorSettings, getSettings, getSettingsFromPath) where
 
-import Prelude
 import Effect (Effect)
+import ExtensionUtils (ExtensionMetadata)
 import ExtensionUtils as ExtensionUtils
-import Gio.SettingsSchemaSource as SettingsSchemaSource
 import Gio.Settings as Settings
+import Gio.SettingsSchemaSource as SettingsSchemaSource
+import Prelude
 
 getSettingsFromPath :: String -> Effect Settings.Settings
 getSettingsFromPath path = do
@@ -12,9 +13,8 @@ getSettingsFromPath path = do
   schema <- SettingsSchemaSource.lookup schemaSource "org.gnome.shell.extensions.autochill" false
   Settings.new_full schema
 
-getSettings :: Effect Settings.Settings
-getSettings = do
-  me <- ExtensionUtils.getCurrentExtension
+getSettings :: ExtensionMetadata -> Effect Settings.Settings
+getSettings me = do
   path <- ExtensionUtils.getPath me "schemas"
   getSettingsFromPath path
 
