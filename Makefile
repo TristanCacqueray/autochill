@@ -5,7 +5,7 @@ NAME := $(shell sh -c 'echo "($(PGS)).uid ./extension.dhall" | env PGS=$(PGS) dh
 MAIN := $(shell sh -c 'echo "($(PGS)).main ./extension.dhall" | env PGS=$(PGS) dhall text')
 
 .PHONY: dist
-dist: dist-meta dist-schemas dist-extension
+dist: dist-meta dist-schemas dist-extension dist-cli
 
 .PHONY: dist-meta
 dist-meta:
@@ -22,6 +22,12 @@ dist-schemas:
 dist-extension:
 	env PGS=$(PGS) spago bundle --module $(MAIN) --outfile $(NAME)/extension.js
 	echo "($(PGS)).boot ./extension.dhall" | env PGS=$(PGS) dhall text >> $(NAME)/extension.js
+
+.PHONY: dist-cli
+dist-cli:
+	env PGS=$(PGS) spago bundle --module $(MAIN)CLI --outfile $(NAME)/cli.js
+	sed -e '/^import . as ExtensionUtils/d' -i $(NAME)/cli.js
+	echo "main()" >> $(NAME)/cli.js
 
 .PHONY: install
 install:
