@@ -2,7 +2,12 @@
   "description": "Help you chill by setting up breath time",
   "name": "autochill",
   "shell-version": [
-    "40.0"
+    "40.0",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45"
   ],
   "url": "https://github.com/TristanCacqueray/autochill",
   "uuid": "autochill@tristancacqueray.github.io",
